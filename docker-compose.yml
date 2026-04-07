@@ -1,0 +1,10 @@
+services:
+  app:
+    build: .
+    env_file: .env
+    volumes:
+      - ${GOOGLE_SERVICE_ACCOUNT_JSON}:/run/secrets/google_sa.json:ro
+      - /usr/bin/ollama:/usr/bin/ollama:ro
+      - /usr/share/ollama:/usr/share/ollama:ro
+    network_mode: host  # needed to reach ollama on localhost:11434
+    restart: "no"
