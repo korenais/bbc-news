@@ -148,9 +148,14 @@ def select_topic(
         slugs_fmt = ", ".join(recent_slugs)
         recent_topics_block = f"RECENTLY PUBLISHED (do not cover the same story again, even from a different angle): {slugs_fmt}\n\n"
 
+    last_category = recent_categories[-1] if recent_categories else None
+    avoid_category_block = ""
+    if last_category:
+        avoid_category_block = f"LAST POST CATEGORY: {last_category} — do NOT pick from this category again, skip it.\n\n"
+
     prompt = f"""You are the editor of Baltic Business Club newsletter. Audience: SMB owners in Estonia and the Baltics — IT, manufacturing (metal/stone/plastics), real estate, investments (stocks, bonds).
 
-{recent_topics_block}
+{recent_topics_block}{avoid_category_block}
 
 CATEGORY DEFINITIONS:
 - technology: AI, software, cybersecurity, chip industry, digital regulation
@@ -191,7 +196,6 @@ Return ONLY valid JSON, no explanation:
 
     idx = int(result["index"])
     selected_group = flat_list[idx]
-    # Category is derived from the group itself, not from Ollama (prevents misclassification)
     category = _guess_category(selected_group)
 
     log.info("Selected group index=%d category=%s title=%s", idx, category, selected_group[0].title[:60])
