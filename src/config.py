@@ -45,4 +45,4 @@ RSS_FEEDS = [
 CATEGORIES = ["technology", "finance", "real_estate", "industry", "geopolitics", "baltic"]
 
 # Breaking news: if a topic appears in this many sources within 48h, bypass rotation
-BREAKING_NEWS_SOURCE_THRESHOLD = 5
+BREAKING_NEWS_SOURCE_THRESHOLD = 999

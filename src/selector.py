@@ -200,5 +200,5 @@ Return ONLY valid JSON, no explanation:
         articles=selected_group,
         category=category,
         topic_slug=result["topic_slug"],
-        is_breaking=result.get("is_breaking", False),
+        is_breaking=_is_breaking(selected_group),
     )
