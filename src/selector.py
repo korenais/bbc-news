@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 
 import httpx
+import os
 
 from .collector import Article
 from .config import OLLAMA_HOST, OLLAMA_MODEL, BREAKING_NEWS_SOURCE_THRESHOLD, CATEGORIES
@@ -20,6 +21,12 @@ class SelectedTopic:
     category: str
     topic_slug: str              # short English slug
     is_breaking: bool = False
+
+
+def _load_selector_prompt() -> str:
+    path = os.path.join(os.path.dirname(__file__), "..", "selector_prompt.txt")
+    with open(os.path.abspath(path), encoding="utf-8") as f:
+        return f.read()
 
 
 def _ollama(prompt: str) -> str:
@@ -74,14 +81,20 @@ def _is_breaking(group: list[Article]) -> bool:
 
 
 def _guess_category(group: list[Article]) -> str:
-    """Map source_category hint to a proper CATEGORIES value."""
+    """Map source_category hint to a proper CATEGORIES value.
+    Prefers specific categories (technology, finance, baltic) over the
+    generic 'geopolitics' fallback used for general news sources."""
     mapping = {
         "technology": "technology",
         "finance": "finance",
         "baltic": "baltic",
         "general": "geopolitics",  # broad default for general sources
     }
-    return mapping.get(group[0].source_category, "geopolitics")
+    categories = [mapping.get(a.source_category, "geopolitics") for a in group]
+    for cat in categories:
+        if cat != "geopolitics":
+            return cat
+    return "geopolitics"
 
 
 def select_topic(
@@ -153,36 +166,14 @@ def select_topic(
     if last_category:
         avoid_category_block = f"LAST POST CATEGORY: {last_category} — do NOT pick from this category again, skip it.\n\n"
 
-    prompt = f"""You are the editor of Baltic Business Club newsletter. Audience: SMB owners in Estonia and the Baltics — IT, manufacturing (metal/stone/plastics), real estate, investments (stocks, bonds).
-
-{recent_topics_block}{avoid_category_block}
-
-CATEGORY DEFINITIONS:
-- technology: AI, software, cybersecurity, chip industry, digital regulation
-- finance: markets, interest rates, central banks, stocks, bonds, crypto
-- real_estate: property markets, construction costs, proptech
-- industry: manufacturing, energy, supply chains, logistics, trade tariffs
-- geopolitics: international relations, sanctions, trade wars, EU/US policy
-- baltic: significant Baltic-specific events only (major crisis, landmark EU law affecting region, large investment). Do NOT use for routine Baltic news.
-
-HOW TO PICK (follow this order strictly):
-1. Start with the first category that has stories (highest priority = top of list).
-2. Read its candidates. Pick the best story for the audience if ANY of these apply:
-   - Affects EU/Baltic business directly (regulations, tariffs, rates, energy)
-   - Has clear economic or operational impact for SMB owners
-   - Breaking or widely covered (count ≥ 3)
-3. If the category has NO suitable story (all are: space exploration, celebrity, sports, or US-only domestic politics with zero EU impact), move to the NEXT category.
-4. Repeat until you find a story. Do not skip a category that has relevant content.
-
-{breaking_section}CANDIDATES BY CATEGORY (priority order, top = pick first):
-{chr(10).join(category_sections)}
-
-Return ONLY valid JSON, no explanation:
-{{
-  "index": <index number shown in brackets above>,
-  "topic_slug": "<short-english-slug-max-5-words>",
-  "is_breaking": <true|false>
-}}"""
+    prompt_template = _load_selector_prompt()
+    prompt = (
+        prompt_template
+        .replace("{recent_topics_block}", recent_topics_block)
+        .replace("{avoid_category_block}", avoid_category_block)
+        .replace("{breaking_section}", breaking_section)
+        .replace("{category_sections}", "\n".join(category_sections))
+    )
 
     raw = _ollama(prompt)
     log.debug("Ollama selector response: %s", raw)

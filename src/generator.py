@@ -21,7 +21,7 @@ class Newsletter:
 
 
 def _load_prompt() -> str:
-    prompt_path = os.path.join(os.path.dirname(__file__), "..", "prompt.txt")
+    prompt_path = os.path.join(os.path.dirname(__file__), "..", "news_writer_prompt.txt")
     with open(os.path.abspath(prompt_path), encoding="utf-8") as f:
         return f.read()
 
