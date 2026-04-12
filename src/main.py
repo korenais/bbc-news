@@ -66,6 +66,19 @@ def main(dry_run: bool = False) -> None:
             log.warning("Topic '%s' already sent — skipping", topic.topic_slug)
             sys.exit(0)
 
+        # 8a. Dry-run: print selected topic only, no generation
+        if dry_run:
+            print("\n" + "=" * 70)
+            print(f"Category:  {topic.category}")
+            print(f"Slug:      {topic.topic_slug}")
+            print(f"Breaking:  {topic.is_breaking}")
+            print(f"Articles:  {len(topic.articles)}")
+            for a in topic.articles[:5]:
+                print(f"  - {a.title} ({a.source_name})")
+            print("=" * 70)
+            log.info("Dry-run complete — topic selected, no newsletter generated")
+            return
+
         # 6. Generate newsletter text
         newsletter = generate(topic)
         if newsletter.topic_slug:
@@ -83,36 +96,6 @@ def main(dry_run: bool = False) -> None:
         full_text = newsletter.text
         if credit:
             full_text += f"\n\n{credit}"
-
-        # 8a. Dry-run: save to file and print path
-        if dry_run:
-            import os
-            from datetime import datetime
-            os.makedirs("output", exist_ok=True)
-            ts = datetime.now().strftime('%Y-%m-%d_%H-%M')
-            base = f"output/{ts}_{topic.topic_slug}"
-            txt_file = f"{base}.txt"
-
-            # Download photo to disk
-            local_photo = None
-            if photo and photo_url:
-                local_photo = save_photo(photo, "output", f"{ts}_{topic.topic_slug}")
-
-            with open(txt_file, "w", encoding="utf-8") as f:
-                f.write(full_text)
-                if local_photo:
-                    f.write(f"\n\nФото: {local_photo}")
-                elif photo_url:
-                    f.write(f"\n\nPhoto URL: {photo_url}")
-
-            print("\n" + "=" * 70)
-            print(full_text)
-            print("=" * 70)
-            print(f"\n✅ Текст:  {txt_file}")
-            if local_photo:
-                print(f"✅ Фото:   {local_photo}")
-            log.info("Dry-run complete — saved to %s", base)
-            return
 
         # 8b. Publish
         tg_msg_id = post_telegram(full_text, photo_url)
