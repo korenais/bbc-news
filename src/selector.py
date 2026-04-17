@@ -10,7 +10,6 @@ import os
 
 from .collector import Article
 from .config import OLLAMA_HOST, OLLAMA_MODEL, BREAKING_NEWS_SOURCE_THRESHOLD, CATEGORIES
-from .rotation import get_category_priorities
 
 log = logging.getLogger(__name__)
 
@@ -104,29 +103,32 @@ def select_topic(
     recent_slugs: list[str] | None = None,
 ) -> SelectedTopic:
     groups = _group_by_topic(articles)
-    priorities = get_category_priorities()  # ordered list, index 0 = highest
+    last_category = recent_categories[-1] if recent_categories else None
+    categories = [c for c in CATEGORIES if c != last_category] + ([last_category] if last_category else [])
 
     # Assign a flat index to each group (used by Ollama to reference them)
     # Breaking news groups get their own section at the top
-    breaking_groups = [g for g in groups if _is_breaking(g)]
+    # Last category is excluded here too — no back-to-back even for breaking news
+    eligible_categories = [c for c in categories if c != last_category]
+    breaking_groups = [g for g in groups if _is_breaking(g) and _guess_category(g) in eligible_categories]
     normal_groups = [g for g in groups if not _is_breaking(g)]
 
     # Build per-category buckets (normal groups only, up to 5 per category)
-    buckets: dict[str, list[tuple[int, list[Article]]]] = {cat: [] for cat in priorities}
+    buckets: dict[str, list[tuple[int, list[Article]]]] = {cat: [] for cat in eligible_categories}
     flat_list: list[list[Article]] = []
 
     # Breaking first
     for g in breaking_groups:
         flat_list.append(g)
 
-    # Normal groups bucketed by category
+    # Normal groups bucketed by category (last_category excluded entirely)
     for g in normal_groups:
         cat = _guess_category(g)
         if cat in buckets and len(buckets[cat]) < 5:
             buckets[cat].append((len(flat_list), g))
             flat_list.append(g)
 
-    log.info("Priority order: %s", priorities)
+    log.info("Eligible categories: %s", eligible_categories)
 
     # Build prompt sections
     breaking_section = ""
@@ -136,13 +138,12 @@ def select_topic(
             titles = " | ".join(a.title for a in g[:3])
             sources = list({a.source_name for a in g})
             lines.append(f'  [{i}] {titles}\n      sources: {", ".join(sources)}')
-        breaking_section = "BREAKING NEWS (pick immediately, skip priority):\n" + "\n".join(lines) + "\n\n"
+        breaking_section = "BREAKING NEWS (pick immediately if highly relevant):\n" + "\n".join(lines) + "\n\n"
 
     category_sections = []
-    for cat in priorities:
+    for cat in eligible_categories:
         items = buckets.get(cat, [])
         if not items:
-            category_sections.append(f"## {cat.upper()}\n  (no stories)")
             continue
         lines = []
         for idx, g in items:
@@ -153,7 +154,7 @@ def select_topic(
 
     log.info(
         "Candidates per category: %s",
-        {cat: len(buckets[cat]) for cat in priorities},
+        {cat: len(buckets[cat]) for cat in eligible_categories},
     )
 
     recent_topics_block = ""
@@ -161,16 +162,10 @@ def select_topic(
         slugs_fmt = ", ".join(recent_slugs)
         recent_topics_block = f"RECENTLY PUBLISHED (do not cover the same story again, even from a different angle): {slugs_fmt}\n\n"
 
-    last_category = recent_categories[-1] if recent_categories else None
-    avoid_category_block = ""
-    if last_category:
-        avoid_category_block = f"LAST POST CATEGORY: {last_category} — do NOT pick from this category again, skip it.\n\n"
-
     prompt_template = _load_selector_prompt()
     prompt = (
         prompt_template
         .replace("{recent_topics_block}", recent_topics_block)
-        .replace("{avoid_category_block}", avoid_category_block)
         .replace("{breaking_section}", breaking_section)
         .replace("{category_sections}", "\n".join(category_sections))
     )

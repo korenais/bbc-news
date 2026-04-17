@@ -13,7 +13,7 @@ from .config import RSS_FEEDS
 log = logging.getLogger(__name__)
 
 FETCH_TIMEOUT = 15  # seconds
-MAX_AGE_HOURS = 24  # ignore articles older than this
+MAX_AGE_HOURS = 36  # ignore articles older than this
 
 
 @dataclass

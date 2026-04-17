@@ -23,11 +23,14 @@ GOOGLE_SERVICE_ACCOUNT_JSON = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "")
 
 RSS_FEEDS = [
     # World — General
-    ("general",    "http://rss.cnn.com/rss/edition.rss"),
+    ("general",    "http://rss.cnn.com/rss/edition.rss"),          # http — SSL broken on https
     ("general",    "https://feeds.content.dowjones.io/public/rss/wsj_world_news"),
     ("general",    "https://feeds.skynews.com/feeds/rss/world.xml"),
     ("general",    "https://feeds.washingtonpost.com/rss/world"),
     ("general",    "https://rss.nytimes.com/services/xml/rss/nyt/World.xml"),
+    ("general",    "http://feeds.feedburner.com/euronews/en/home/"), # Euronews — EU perspective
+    ("general",    "https://www.politico.eu/feed/"),                 # Politico Europe — EU regulations & policy
+    ("general",    "https://euobserver.com/feed"),                   # EUobserver — EU institutions & business law
     # World — Business & Finance
     ("finance",    "https://feeds.bloomberg.com/markets/news.rss"),
     ("finance",    "https://finance.yahoo.com/news/rssindex"),
@@ -38,11 +41,13 @@ RSS_FEEDS = [
     ("technology", "https://www.technologyreview.com/feed/"),
     ("technology", "https://www.theverge.com/rss/index.xml"),
     # Baltic
-    ("baltic",     "https://news.err.ee/rss"),
-    ("baltic",     "https://www.baltictimes.com/rss/"),
+    ("baltic",     "https://news.err.ee/rss"),                       # Estonia — ERR
+    ("baltic",     "https://www.baltictimes.com/rss/"),              # Pan-Baltic
+    ("baltic",     "https://bnn-news.com/feed/"),                    # Baltic News Network — Latvia focus
+    ("baltic",     "https://eng.lsm.lv/rss/?lang=en&catid=315"),    # LSM Latvia — public broadcaster
 ]
 
 CATEGORIES = ["technology", "finance", "real_estate", "industry", "geopolitics", "baltic"]
 
 # Breaking news: if a topic appears in this many sources within 48h, bypass rotation
-BREAKING_NEWS_SOURCE_THRESHOLD = 999
+BREAKING_NEWS_SOURCE_THRESHOLD = 3
