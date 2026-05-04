@@ -1,4 +1,4 @@
-"""Pick the best topic using Ollama, respecting category rotation."""
+"""Pick the best topic using GPT-4o (fallback: Ollama)."""
 import json
 import logging
 import re
@@ -9,7 +9,7 @@ import httpx
 import os
 
 from .collector import Article
-from .config import OLLAMA_HOST, OLLAMA_MODEL, BREAKING_NEWS_SOURCE_THRESHOLD, CATEGORIES
+from .config import OLLAMA_HOST, OLLAMA_MODEL, OPENAI_API_KEY, OPENAI_MODEL, BREAKING_NEWS_SOURCE_THRESHOLD, CATEGORIES
 
 log = logging.getLogger(__name__)
 
@@ -28,6 +28,21 @@ def _load_selector_prompt() -> str:
         return f.read()
 
 
+def _gpt(prompt: str) -> str:
+    resp = httpx.post(
+        "https://api.openai.com/v1/chat/completions",
+        headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
+        json={
+            "model": OPENAI_MODEL,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0,
+        },
+        timeout=60,
+    )
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"].strip()
+
+
 def _ollama(prompt: str) -> str:
     resp = httpx.post(
         f"{OLLAMA_HOST}/api/generate",
@@ -36,6 +51,14 @@ def _ollama(prompt: str) -> str:
     )
     resp.raise_for_status()
     return resp.json()["response"].strip()
+
+
+def _call_llm(prompt: str) -> str:
+    if OPENAI_API_KEY:
+        log.info("Selector using GPT (%s)", OPENAI_MODEL)
+        return _gpt(prompt)
+    log.info("Selector using Ollama (%s)", OLLAMA_MODEL)
+    return _ollama(prompt)
 
 
 _STOPWORDS = {
@@ -170,8 +193,8 @@ def select_topic(
         .replace("{category_sections}", "\n".join(category_sections))
     )
 
-    raw = _ollama(prompt)
-    log.debug("Ollama selector response: %s", raw)
+    raw = _call_llm(prompt)
+    log.debug("Selector response: %s", raw)
 
     match = re.search(r"\{[^{}]*\}", raw, re.DOTALL)
     if not match:
